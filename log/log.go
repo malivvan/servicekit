@@ -125,3 +125,10 @@ func Warn() *zerolog.Event {
 func Error() *zerolog.Event {
 	return logger.Error()
 }
+
+// With creates a new logger context.
+//
+// You must call Logger on the returned Context in order to get a logger.
+func With() zerolog.Context {
+	return logger.With()
+}
