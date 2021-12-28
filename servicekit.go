@@ -2,20 +2,23 @@
 package servicekit
 
 import (
-	"github.com/kardianos/service"
-	"os"
 	"bufio"
-	"runtime"
-	"path/filepath"
-	"strings"
-	"io"
-	"os/user"
 	"errors"
-	"strconv"
 	"fmt"
+	"io"
+	"os"
+	"os/user"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+
+	"github.com/kardianos/service"
 )
 
-type Config struct {
+var serviceInfo Info
+
+type Info struct {
 	Name        string
 	DisplayName string
 	Description string
@@ -23,25 +26,40 @@ type Config struct {
 }
 
 type Interface interface {
-	Start(workdir Workdir) error
+	Start() error
 	Stop() error
 }
 
 type wrapper struct {
-	workdir Workdir
 	program Interface
 }
 
 func (w *wrapper) Start(s service.Service) error {
-	return w.program.Start(w.workdir)
+	return w.program.Start()
 }
 
 func (w *wrapper) Stop(s service.Service) error {
 	return w.program.Stop()
 }
 
-func Wrap(config Config, program Interface) {
-	serviceConfig, err := config.evaluate()
+func Workdir(p ...string) string {
+	if len(p) == 0 {
+		return string(os.Args[2])
+	}
+	return filepath.Join(append([]string{string(os.Args[2])}, p...)...)
+}
+
+func Name() string {
+	return serviceInfo.Name
+}
+
+func Version() string {
+	return serviceInfo.Version
+}
+
+func Wrap(info Info, program Interface) {
+	serviceInfo = info
+	serviceConfig, err := info.evaluate()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
@@ -51,7 +69,7 @@ func Wrap(config Config, program Interface) {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "version":
-			fmt.Fprintln(os.Stdout, config.Name, "v"+config.Version)
+			fmt.Fprintln(os.Stdout, info.Name, "v"+info.Version)
 			os.Exit(0)
 
 		case "run":
@@ -68,7 +86,6 @@ func Wrap(config Config, program Interface) {
 			}
 
 			// create and run service
-			serviceWrapper.workdir = Workdir(os.Args[2])
 			serviceConfig.Arguments = []string{"run", os.Args[2]}
 			s, err := service.New(serviceWrapper, serviceConfig)
 			if err != nil {
@@ -87,7 +104,7 @@ func Wrap(config Config, program Interface) {
 			// read missing parameters and validate
 			username := ""
 			workdir := ""
-			defaultWorkdir := getDefaultWorkdir(config.Name)
+			defaultWorkdir := getDefaultWorkdir(info.Name)
 			if runtime.GOOS == "linux" {
 				username, err = userInput("Username", 2, "")
 				if err != nil {
@@ -118,7 +135,7 @@ func Wrap(config Config, program Interface) {
 			}
 
 			// define install path
-			installPath := filepath.Join(workdir, config.Name)
+			installPath := filepath.Join(workdir, info.Name)
 			if runtime.GOOS == "windows" {
 				installPath += ".exe"
 			}
@@ -190,7 +207,7 @@ func Wrap(config Config, program Interface) {
 				}
 			}
 
-			fmt.Fprintln(os.Stdout, "Service", config.Name, "installed!")
+			fmt.Fprintln(os.Stdout, "Service", info.Name, "installed!")
 			os.Exit(0)
 		case "uninstall":
 			s, err := service.New(serviceWrapper, serviceConfig)
@@ -208,7 +225,7 @@ func Wrap(config Config, program Interface) {
 				os.Exit(1)
 			}
 
-			fmt.Fprintln(os.Stdout, "Service", config.Name, "uninstalled!")
+			fmt.Fprintln(os.Stdout, "Service", info.Name, "uninstalled!")
 			os.Exit(0)
 		case "start", "stop", "restart":
 			s, err := service.New(serviceWrapper, serviceConfig)
@@ -222,21 +239,21 @@ func Wrap(config Config, program Interface) {
 				os.Exit(1)
 			}
 
-			fmt.Fprintln(os.Stdout, "Service", config.Name, os.Args[1]+"ed!")
+			fmt.Fprintln(os.Stdout, "Service", info.Name, os.Args[1]+"ed!")
 			os.Exit(0)
 		}
 	}
 
-	usage(config)
+	usage(info)
 	os.Exit(0)
 }
 
-func usage(config Config) {
-	fmt.Fprintln(os.Stdout, "SERVICE", config.Name, "v"+config.Version)
+func usage(info Info) {
+	fmt.Fprintln(os.Stdout, "SERVICE", info.Name, "v"+info.Version)
 	fmt.Fprintln(os.Stdout)
-	if config.Description != "" {
+	if info.Description != "" {
 		cursor := 0
-		for _, word := range strings.Fields(config.Description) {
+		for _, word := range strings.Fields(info.Description) {
 			if cursor+len(word) > 60 {
 				cursor = 0
 				fmt.Fprintln(os.Stdout)
@@ -262,7 +279,7 @@ func usage(config Config) {
 	fmt.Fprintln(os.Stdout, "  version")
 }
 
-func (config *Config) evaluate() (*service.Config, error) {
+func (config *Info) evaluate() (*service.Config, error) {
 	if config.Name == "" {
 		return nil, errors.New("service name is empty")
 	}
