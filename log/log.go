@@ -1,14 +1,15 @@
 package log
 
 import (
-	"github.com/rs/zerolog"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"errors"
 	"io"
-	"github.com/kardianos/service"
 	"os"
 	"path/filepath"
-	"errors"
 	"runtime"
+
+	"github.com/kardianos/service"
+	"github.com/rs/zerolog"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
