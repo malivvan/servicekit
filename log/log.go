@@ -8,6 +8,7 @@ import (
 	"runtime"
 
 	"github.com/kardianos/service"
+	"github.com/malivvan/servicekit"
 	"github.com/rs/zerolog"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -42,7 +43,9 @@ type Config struct {
 	Compress bool `json:"compress"`
 }
 
-func Start(path string, config *Config) error {
+func Start(config Config) error {
+	path := servicekit.Workdir("log", servicekit.Name()+".json")
+
 	err := os.MkdirAll(filepath.Dir(path), 0700)
 	if err != nil {
 		return err

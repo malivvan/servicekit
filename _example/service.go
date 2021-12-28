@@ -38,11 +38,10 @@ func (s *service) Start() error {
 	if err != nil {
 		return err
 	}
-
 	fmt.Println(config)
 
 	// 3. Configure Logging.
-	err = log.Start(servicekit.Workdir("log"), &config.Logging)
+	err = log.Start(config.Logging)
 	if err != nil {
 		return err
 	}
