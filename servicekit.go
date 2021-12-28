@@ -279,23 +279,23 @@ func usage(info Info) {
 	fmt.Fprintln(os.Stdout, "  version")
 }
 
-func (config *Info) evaluate() (*service.Config, error) {
-	if config.Name == "" {
+func (info *Info) evaluate() (*service.Config, error) {
+	if info.Name == "" {
 		return nil, errors.New("service name is empty")
 	}
-	if strings.Contains(config.Name, " ") {
+	if strings.Contains(info.Name, " ") {
 		return nil, errors.New("service name cannot contain whitespaces")
 	}
-	if config.Version == "" {
+	if info.Version == "" {
 		return nil, errors.New("service version is empty")
 	}
-	if config.DisplayName == "" {
-		config.DisplayName = config.Name
+	if info.DisplayName == "" {
+		info.DisplayName = info.Name
 	}
 	return &service.Config{
-		Name:        config.Name,
-		DisplayName: config.DisplayName,
-		Description: config.Description,
+		Name:        info.Name,
+		DisplayName: info.DisplayName,
+		Description: info.Description,
 	}, nil
 }
 
