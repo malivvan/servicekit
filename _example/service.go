@@ -1,11 +1,10 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/malivvan/servicekit"
 	"github.com/malivvan/servicekit/conf"
 	"github.com/malivvan/servicekit/log"
+	"github.com/malivvan/servicekit/mon"
 )
 
 func main() { servicekit.Wrap(info, new(service)) }
@@ -17,9 +16,17 @@ var info = servicekit.Info{
 }
 
 var config = struct {
-	Test    string     `encrypt:"true"`
-	Logging log.Config `json:"logging"`
+	Monitoring mon.Config `json:"monitoring"`
+	Logging    log.Config `json:"logging"`
 }{
+	Monitoring: mon.Config{
+		URL:       "https://influx.example.org",
+		Token:     "my-token",
+		Org:       "malivvan",
+		Bucket:    "malivvan",
+		Prefix:    "service/",
+		Seperator: "/",
+	},
 	Logging: log.Config{
 		MaxSize:    10,
 		MaxAge:     60,
@@ -38,17 +45,23 @@ func (s *service) Start() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(config)
 
-	// 3. Configure Logging.
-	err = log.Start(config.Logging)
+	// 2. Start Monitoring.
+	err = mon.Start(config.Monitoring)
 	if err != nil {
 		return err
 	}
+
+	// 3. Configure Logging.
+	err = log.Start(config.Logging, mon.LogWriter{})
+	if err != nil {
+		return err
+	}
+
 	log.Info().Msg("starting service")
 
 	log.Warn().Msg("warn test")
-	log.Error().Msg("error test")
+	log.Error().Int("threshold", 1337).Msg("error test")
 
 	// ...
 
@@ -64,6 +77,8 @@ func (s *service) Stop() error {
 	log.Info().Msg("stopped service")
 
 	// stop service packages
+
 	log.Stop()
+	mon.Stop()
 	return nil
 }
