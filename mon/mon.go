@@ -2,6 +2,7 @@ package mon
 
 import (
 	"os"
+	"sync"
 	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -11,10 +12,12 @@ import (
 )
 
 var (
-	influxClient        influxdb2.Client
-	influxWriteAPI      api.WriteAPI
-	influxNameSeperator string
-	influxNamePrefix    string
+	influxClient          influxdb2.Client
+	influxWriteAPI        api.WriteAPI
+	influxNameSeperator   string
+	influxNamePrefix      string
+	measurementsRegister_ sync.Mutex
+	measurementsRegister  = []*Measurement{}
 )
 
 type Config struct {
@@ -51,6 +54,15 @@ func Start(config Config) error {
 }
 
 func Stop() {
+
+	// cleanup measurement routines
+	measurementsRegister_.Lock()
+	for _, measurement := range measurementsRegister {
+		measurement.Stop()
+	}
+	measurementsRegister_.Unlock()
+
+	// flush influx connection and close
 	influxWriteAPI.Flush()
 	influxClient.Close()
 }

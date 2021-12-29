@@ -1,6 +1,8 @@
 package main
 
 import (
+	"runtime"
+
 	"github.com/malivvan/servicekit"
 	"github.com/malivvan/servicekit/conf"
 	"github.com/malivvan/servicekit/log"
@@ -62,6 +64,14 @@ func (s *service) Start() error {
 
 	log.Warn().Msg("warn test")
 	log.Error().Int("threshold", 1337).Msg("error test")
+
+	mon.New("stats", nil).
+		Int("mem", mon.AVG, mon.MAX, mon.MIN, mon.COUNT).
+		Start(10000, 1000, func(values map[string]interface{}) {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			values["mem"] = m.Alloc
+		})
 
 	// ...
 
