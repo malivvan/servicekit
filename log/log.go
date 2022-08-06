@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 
 	"github.com/kardianos/service"
 	"github.com/malivvan/servicekit"
@@ -44,17 +43,9 @@ type Config struct {
 	Compress bool `json:"compress"`
 }
 
-func init() {
-	zerolog.TimeFieldFormat = time.RFC3339Nano
-	zerolog.TimestampFieldName = "time"
-	zerolog.LevelFieldName = "level"
-	zerolog.MessageFieldName = "message"
-}
-
-func Start(config Config, logWriters ...io.Writer) error {
-
-	// create file logger path
+func Start(config Config) error {
 	path := servicekit.Workdir("log", servicekit.Name()+".json")
+
 	err := os.MkdirAll(filepath.Dir(path), 0700)
 	if err != nil {
 		return err
@@ -68,15 +59,21 @@ func Start(config Config, logWriters ...io.Writer) error {
 		MaxBackups: config.MaxBackups,
 		Compress:   config.Compress,
 	}
-	logWriters = append(logWriters, fileLogger)
+	var logWriter io.Writer
+	logWriter = fileLogger
 
 	// if interactive write formated log to stderr, disable color on windows
 	if service.Interactive() {
-		logWriters = append(logWriters, zerolog.ConsoleWriter{
+		logWriter = io.MultiWriter(zerolog.SyncWriter(zerolog.ConsoleWriter{
 			Out:     os.Stderr,
 			NoColor: runtime.GOOS == "windows",
-		})
+		}), logWriter)
 	}
+
+	// minimize json footprint
+	zerolog.TimestampFieldName = "T"
+	zerolog.LevelFieldName = "L"
+	zerolog.MessageFieldName = "M"
 
 	// set loglevel
 	switch config.Level {
@@ -95,7 +92,7 @@ func Start(config Config, logWriters ...io.Writer) error {
 	}
 
 	// initialize logger
-	logger = zerolog.New(io.MultiWriter(logWriters...)).With().Timestamp().Logger()
+	logger = zerolog.New(logWriter).With().Timestamp().Logger()
 	return nil
 }
 
