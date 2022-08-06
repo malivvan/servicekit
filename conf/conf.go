@@ -3,11 +3,12 @@ package conf
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
-	"io/ioutil"
+	"io"
+	"os"
 	"reflect"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/malivvan/servicekit"
 	"github.com/malivvan/servicekit/crypto"
 )
@@ -18,24 +19,60 @@ const (
 	cryptoTag    = "encrypt"
 )
 
-func Load(secret string, config interface{}) error {
-	path := servicekit.Workdir(servicekit.Name() + ".json")
+type File interface {
+	io.Reader
+	io.Writer
+	io.Seeker
+	Truncate(size int64) error
+}
+
+func LoadFile(path string, secret string, config interface{}) error {
+	if(path == "") {
+		path = servicekit.Workdir(servicekit.Name() + ".toml")
+	}
+	file, err := os.OpenFile(path, os.O_CREATE | os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return Load(file, secret, config)
+}
+
+func Load(file File, secret string, config interface{}) error {
 
 	// 1. read bytes, if not exist write initial config
-	configBytes, err := ioutil.ReadFile(path)
+	_, err := file.Seek(0, io.SeekStart)
 	if err != nil {
-		configBytes, err = json.MarshalIndent(config, "", "  ")
+		return err
+	}
+	configBytes, err := io.ReadAll(file)
+	if err != nil {
+		var configBuf bytes.Buffer
+		err := toml.NewEncoder(&configBuf).Encode(config)
 		if err != nil {
 			return err
 		}
-		err = ioutil.WriteFile(path, configBytes, 0600)
+		configBytes = configBuf.Bytes()
+		_, err = file.Seek(0, io.SeekStart)
+		if err != nil {
+			return err
+		}
+		_, err = file.Write(configBytes)
+		if err != nil {
+			return err
+		}
+		err = file.Truncate(int64(len(configBytes)))
 		if err != nil {
 			return err
 		}
 	}
 
 	// 2. decode config and encrypt all unencrypted strings
-	err = json.Unmarshal(configBytes, config)
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+	_, err = toml.Decode(string(configBytes), config)
 	if err != nil {
 		return err
 	}
@@ -53,12 +90,22 @@ func Load(secret string, config interface{}) error {
 	}
 
 	// 3. if config was altered save to disk
-	newConfigBytes, err := json.MarshalIndent(config, "", "  ")
+	var newConfigBuf bytes.Buffer
+	err = toml.NewEncoder(&newConfigBuf).Encode(config)
 	if err != nil {
 		return err
 	}
+	newConfigBytes := newConfigBuf.Bytes()
 	if !bytes.Equal(newConfigBytes, configBytes) {
-		err = ioutil.WriteFile(path, newConfigBytes, 0600)
+		_, err = file.Seek(0, io.SeekStart)
+		if err != nil {
+			return err
+		}
+		_, err = file.Write(newConfigBytes)
+		if err != nil {
+			return err
+		}
+		err = file.Truncate(int64(len(newConfigBytes)))
 		if err != nil {
 			return err
 		}

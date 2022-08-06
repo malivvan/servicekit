@@ -17,7 +17,7 @@ var info = servicekit.Info{
 }
 
 var config = struct {
-	Test    string     `encrypt:"true"`
+	Secret    string   `encrypt:"true"`
 	Logging log.Config `json:"logging"`
 }{
 	Logging: log.Config{
@@ -33,22 +33,19 @@ type service struct{}
 
 func (s *service) Start() error {
 
-	// 1. Configure Service.
-	err := conf.Load("secret", &config)
+	// Configure Service.
+	err := conf.LoadFile("", "secret", &config)
 	if err != nil {
 		return err
 	}
 	fmt.Println(config)
 
-	// 3. Configure Logging.
+	// Configure Logging.
 	err = log.Start(config.Logging)
 	if err != nil {
 		return err
 	}
 	log.Info().Msg("starting service")
-
-	log.Warn().Msg("warn test")
-	log.Error().Msg("error test")
 
 	// ...
 
@@ -62,8 +59,6 @@ func (s *service) Stop() error {
 	// ...
 
 	log.Info().Msg("stopped service")
-
-	// stop service packages
 	log.Stop()
 	return nil
 }
