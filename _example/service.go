@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/malivvan/servicekit"
-	"github.com/malivvan/servicekit/conf"
+	"github.com/malivvan/servicekit/cfg"
 	"github.com/malivvan/servicekit/log"
 )
 
@@ -17,8 +16,8 @@ var info = servicekit.Info{
 }
 
 var config = struct {
-	Secret    string   `encrypt:"true"`
-	Logging log.Config `json:"logging"`
+	Secret  string     `encrypt:"0nv7zn087nz01v7n0"`
+	Logging log.Config `yaml:"logging"`
 }{
 	Logging: log.Config{
 		MaxSize:    10,
@@ -34,7 +33,7 @@ type service struct{}
 func (s *service) Start() error {
 
 	// Configure Service.
-	err := conf.LoadFile("", "secret", &config)
+	err := cfg.LoadFile(servicekit.Workdir("config.yaml"), &config)
 	if err != nil {
 		return err
 	}
